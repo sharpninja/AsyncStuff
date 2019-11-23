@@ -49,9 +49,9 @@ namespace Async
 
                 try
                 {
-                    //source.CancelAfter(milliseconds / 2);
+                    source.CancelAfter(milliseconds / 2);
 
-                    return await tasks.AsTask(token);
+                    return await await tasks.AsTask(token);
                 }
                 catch (Exception ex)
                 {
@@ -68,34 +68,24 @@ namespace Async
 
     public static class Extensions
     {
-        public static Task<(T1, T2)> AsTask<T1, T2>(this (Task<T1> T1, Task<T2> T2) pair, CancellationToken token)
+        public static async Task<Task<(T1, T2)>> AsTask<T1, T2>(this (Task<T1> T1, Task<T2> T2) pair, CancellationToken token)
         {
-            var tcs = new TaskCompletionSource<(T1, T2)>();
+            var tcs = new TaskCompletionSource<(T1,T2)>();
 
             try
             {
                 var tasks = new Task[] {
-                    pair.T1.TaskRunner<T1>(token).GetAwaiter().GetResult()
-                    , pair.T2.TaskRunner<T2>(token).GetAwaiter().GetResult()
+                    await pair.T1.TaskRunner<T1>(token)
+                    , await pair.T2.TaskRunner<T2>(token)
                 };
 
-                var awaiter = Task.WhenAll(tasks).GetAwaiter();
-                awaiter.GetResult();
+                await Task.WhenAll(tasks);
 
-                if (awaiter.IsCompleted)
-                {
-                    Debug.WriteLine("All completed.");
-                    tcs.TrySetResult((pair.T1.Result, pair.T2.Result));
-                }
-                else
-                {
-                    Debug.WriteLine("Canceled");
-                    tcs.SetCanceled();
-                }
+                Debug.WriteLine("All completed.");
+                tcs.SetResult((pair.T1.Result, pair.T2.Result));
             }
             catch (TaskCanceledException)
             {
-                Debug.WriteLine("Canceled");
                 tcs.SetCanceled();
             }
             catch (Exception ex)
